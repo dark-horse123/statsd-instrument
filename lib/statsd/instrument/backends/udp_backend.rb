@@ -65,10 +65,14 @@ module StatsD::Instrument::Backends
       command = "#{metric.name}:#{metric.value}|#{metric.type}"
       command << "|@#{metric.sample_rate}" if metric.sample_rate < 1 || (implementation == :statsite && metric.sample_rate > 1)
       if metric.tags
-        if tags_supported?
+        if tags_supported? && implementation == :datadog
           command << "|##{metric.tags.join(',')}"
+        elsif tags_supported? && implementation == :collectd
+          metric_tags = "#{metric.tags.join(',')}"
+          metric_tags = metric_tags.prepend("[") << "]"
+          command.prepend(metric_tags.gsub(":", "="))
         else
-          StatsD.logger.warn("[StatsD] Tags are only supported on Datadog implementation.")
+          StatsD.logger.warn("[StatsD] Tags are only supported on Datadog and CollectD implementation.")
         end
       end
 
@@ -77,7 +81,7 @@ module StatsD::Instrument::Backends
     end
 
     def tags_supported?
-      implementation == :datadog
+      implementation == :datadog || implementation == :collectd
     end
 
     def write_packet(command)
